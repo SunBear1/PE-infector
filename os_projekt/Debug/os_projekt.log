@@ -1,0 +1,8 @@
+﻿  os_projekt.cpp
+  The contents of <filesystem> are available only with C++17 or later.
+C:\Users\lukin\OneDrive\INF\os_projekt\os_projekt.cpp(137,16): warning C4477: „printf”: ciąg formatu „%s” wymaga argumentu typu „char *”, ale argument 1 ze zmienną liczbą argumentów ma typ „LPCWSTR”
+C:\Users\lukin\OneDrive\INF\os_projekt\os_projekt.cpp(137,16): message : rozważ użycie elementu „%ls” w ciągu formatu
+C:\Users\lukin\OneDrive\INF\os_projekt\os_projekt.cpp(137,16): message : rozważ użycie elementu „%lls” w ciągu formatu
+C:\Users\lukin\OneDrive\INF\os_projekt\os_projekt.cpp(137,16): message : rozważ użycie elementu „%Ls” w ciągu formatu
+C:\Users\lukin\OneDrive\INF\os_projekt\os_projekt.cpp(137,16): message : rozważ użycie elementu „%ws” w ciągu formatu
+  os_projekt.vcxproj -> C:\Users\lukin\OneDrive\INF\os_projekt\Debug\os_projekt.exe
