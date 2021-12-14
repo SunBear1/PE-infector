@@ -1,0 +1,10 @@
+﻿  main.c
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(131,24): warning C4022: 'memcpy': pointer mismatch for actual parameter 2
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(142,11): warning C4022: 'memcpy': pointer mismatch for actual parameter 1
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(155,11): warning C4022: 'memcpy': pointer mismatch for actual parameter 1
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(123,1): warning C4047: 'initializing': 'LPVOID' differs in levels of indirection from 'DWORD'
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(140,1): warning C4047: 'initializing': 'DWORD' differs in levels of indirection from 'LPBYTE'
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(141,1): warning C4047: 'initializing': 'DWORD' differs in levels of indirection from 'LPVOID'
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(153,1): warning C4047: 'initializing': 'DWORD' differs in levels of indirection from 'LPBYTE'
+C:\Users\LocalAdmin\Desktop\PeFileInfector\main.c(70,9): warning C4101: 'start': unreferenced local variable
+  PeFileInfector.vcxproj -> C:\Users\LocalAdmin\Desktop\PeFileInfector\Debug\PeFileInfector.exe
