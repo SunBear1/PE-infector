@@ -4,9 +4,7 @@ extern _MessageBoxA@16: PROC
 extern _ExitProcess@4: PROC
 public _shellcode, _get_size, _get_adr
 
-; 18,446,744,073,709,551,615
 .data
-tytul db 'TEST', 0
 
 .code
 

